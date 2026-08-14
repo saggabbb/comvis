@@ -1,76 +1,26 @@
 """
 backend/config.py
-=================
-
-Configuration constants for the SignVision ASL
-web application.
+==================
+Configuration constants for the ASL web application.
 """
 
 import os
 
+# Base directories
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.abspath(os.path.join(BACKEND_DIR, ".."))
 
-# ============================================================
-# BASE DIRECTORIES
-# ============================================================
-
-# Lokasi folder backend/
-BACKEND_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
-
-# Lokasi root project/
-ROOT_DIR = os.path.abspath(
-    os.path.join(BACKEND_DIR, "..")
-)
-
-
-# ============================================================
-# SERVER CONFIGURATION
-# ============================================================
-
+# Server
 HOST = "0.0.0.0"
-
 PORT = 8000
-
 WS_PREDICT_PATH = "/ws/predict"
 
+# Model paths
+MODEL_PATH = os.path.join(ROOT_DIR, "model", "model.keras")
+LABELS_PATH = os.path.join(ROOT_DIR, "model", "labels.json")
 
-# ============================================================
-# MODEL CONFIGURATION
-# ============================================================
-
-# Model hasil final training + fine-tuning
-MODEL_PATH = os.path.join(
-    ROOT_DIR,
-    "model",
-    "SignVision_EfficientNetB0_final.keras"
-)
-
-# Mapping index output model → nama kelas
-LABELS_PATH = os.path.join(
-    ROOT_DIR,
-    "model",
-    "class_names.json"
-)
-
-
-# ============================================================
-# PREDICTION CONFIGURATION
-# ============================================================
-
-# Ukuran input model
-IMG_SIZE = 224
-
-# Minimum confidence prediction
-CONFIDENCE_THRESHOLD = 0.60
-
-# Maximum prediction FPS
-MAX_FPS = 8
-
-
-# ============================================================
-# SIGN LANGUAGE SETTINGS
-# ============================================================
-
-# Trigger word yang digunakan aplikasi
+# Prediction
 TRIGGER_WORD = "HENGKY"
+CONFIDENCE_THRESHOLD = 0.60
+MAX_FPS = 8
+IMG_SIZE = 224
