@@ -3,7 +3,7 @@ model/predict.py
 =================
 Prediction wrapper for the EfficientNetB0-based ASL image classifier.
 
-Loads SignVision_EfficientNetB0.keras and labels.json, provides a simple predict() interface
+Loads model.keras and labels.json, provides a simple predict() interface
 for both webcam frames and image files.
 """
 
@@ -25,7 +25,7 @@ class ImageClassifier:
 
     def __init__(self, model_path=None, labels_path=None, img_size=224):
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.model_path = model_path or os.path.join(base_dir, "SignVision_EfficientNetB0.keras")
+        self.model_path = model_path or os.path.join(base_dir, "model.keras")
         self.labels_path = labels_path or os.path.join(base_dir, "labels.json")
         self.img_size = img_size
 
