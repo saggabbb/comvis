@@ -4,4 +4,7 @@ tensorflow
 scikit-learn
 matplotlib
 pillow
-mediapipe
+fastapi
+uvicorn[standard]
+websockets
+python-multipart

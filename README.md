@@ -1,60 +1,55 @@
-# ASL Alphabet Recognition — EfficientNetB0
+# ASL Alphabet Recognition — Web Application Architecture
 
-Aplikasi Python untuk mendeteksi dan mengklasifikasikan bahasa isyarat alfabet (A-Z) secara real-time menggunakan webcam dan CNN berbasis EfficientNetB0 Transfer Learning.
+Aplikasi web real-time untuk pengenalan Bahasa Isyarat (ASL Alphabet A-Z) berbasis **FastAPI + WebSocket + HTML5 Browser Webcam** dengan antarmuka futuristik minimalis.
 
-## Arsitektur
+---
 
-```
-Dataset Images (200x200 RGB)
-    |
-Image Preprocessing (resize 224x224, normalize)
-    |
-Data Augmentation (flip, rotation, zoom, brightness)
-    |
-EfficientNetB0 (ImageNet pretrained, frozen)
-    |
-GlobalAveragePooling2D
-    |
-Dropout(0.3)
-    |
-Dense(26, softmax)
-    |
-Real-time Webcam Prediction + Sentence Builder
-```
+## 🎨 UI & Aesthetics
 
-## Stack Teknologi
+- **Theme**: Dark Apple-like minimalism & AI Laboratory Aesthetic.
+- **Color Palette**:
+  - Background: `#08080C`
+  - Surface: `#111116`
+  - Primary: `#8B5CF6`
+  - Secondary: `#EC4899`
+  - Text: `#F5F5F5`
+  - Muted: `#71717A`
 
-| Library | Fungsi |
-|---------|--------|
-| TensorFlow / Keras | Model CNN + Transfer Learning |
-| EfficientNetB0 | Backbone (ImageNet weights) |
-| OpenCV | Webcam capture + visualisasi |
-| NumPy | Manipulasi array |
-| Scikit-Learn | Train/test split + evaluasi |
-| Matplotlib | Plot training history |
-| Pillow | Loading gambar dataset |
+---
 
-## Struktur Proyek
+## 📁 Data & File Structure
 
 ```
-project/
-├── dataset/
-│   ├── A/ ... Z/              # 800 gambar per huruf
+jst/
 ├── model/
-│   ├── train_images.py        # Script training EfficientNetB0
-│   ├── predict.py             # Wrapper prediksi
-│   ├── model.keras            # Model terlatih
-│   ├── labels.json            # Nama label kelas
-│   ├── training_history.png   # Grafik accuracy + loss
-│   ├── classification_report.txt
-│   └── confusion_matrix.csv
-├── realtime.py                # Deteksi real-time + sentence builder
-├── helpers.py                 # Fungsi utilitas
+│   ├── model.keras             # (Opsional) EfficientNet model weights
+│   ├── labels.json              # (Opsional) Label mapping (A-Z)
+│   ├── train_images.py          # Script training EfficientNetB0
+│   └── predict.py               # ImageClassifier wrapper
+├── backend/
+│   ├── main.py                  # Server FastAPI & WebSocket /ws/predict
+│   ├── predictor.py             # DummyPredictor & EfficientNetPredictor
+│   └── config.py                # Konfigurasi aplikasi & trigger word
+├── web/
+│   ├── index.html               # Landing page (ASL. SIGN. RECOGNIZE. CONNECT.)
+│   ├── studio.html              # Studio page (Live video & AI Prediction)
+│   ├── secret.html              # Secret unlocked page (Easter Egg)
+│   ├── css/
+│   │   ├── style.css            # Styling landing page
+│   │   ├── studio.css           # Styling studio page & components
+│   │   └── secret.css           # Styling secret page
+│   └── js/
+│       ├── camera.js            # Module HTML5 navigator.mediaDevices camera
+│       ├── websocket.js         # Module Client WebSocket dengan auto-reconnect
+│       ├── sentence.js          # Module Sentence Builder & Trigger Detector
+│       └── studio.js            # Orchestrator UI & prediction loop (8 FPS)
 ├── requirements.txt
 └── README.md
 ```
 
-## Cara Menggunakan
+---
+
+## 🚀 Cara Menjalankan Aplikasi
 
 ### 1. Install Dependensi
 
@@ -62,84 +57,41 @@ project/
 pip install -r requirements.txt
 ```
 
-### 2. Siapkan Dataset
+### 2. Jalankan Server FastAPI
 
-Pastikan folder `dataset/` berisi subfolder A-Z, masing-masing berisi gambar tangan yang menunjukkan huruf tersebut.
-
-```
-dataset/
-├── A/   (800 gambar)
-├── B/   (800 gambar)
-├── ...
-└── Z/   (800 gambar)
-```
-
-Untuk mengganti dataset:
-- Hapus isi folder A-Z lama
-- Isi dengan gambar baru
-- Pastikan semua gambar berformat JPG/PNG
-- Jalankan ulang training
-
-### 3. Training Model
+Jalankan perintah berikut dari root project (`jst/`):
 
 ```bash
-python model/train_images.py --dataset dataset --epochs 30 --batch 32
+python backend/main.py
 ```
 
-**Output:**
-- `model/model.keras` — Model terlatih
-- `model/labels.json` — Label kelas A-Z
-- `model/training_history.png` — Grafik accuracy dan loss
-- `model/classification_report.txt` — Laporan per kelas
-- `model/confusion_matrix.csv` — Confusion matrix
-
-**Parameter opsional:**
-- `--epochs N` — Jumlah epoch maksimum (default: 30)
-- `--batch N` — Batch size (default: 32)
-- `--img-size N` — Ukuran gambar (default: 224)
-
-### 4. Real-time Detection
+Atau menggunakan uvicorn langsung:
 
 ```bash
-python realtime.py
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Tampilan Real-time
-- **Bounding Box (ROI)** — Area hijau untuk meletakkan tangan
-- **Prediction** — Huruf yang dikenali
-- **Confidence** — Persentase keyakinan model
-- **FPS** — Frame per detik
-- **Sentence Builder** — Bar pembentuk kalimat
+### 3. Buka Aplikasi di Browser
 
-### Keyboard Controls
+Buka URL berikut di Google Chrome, Edge, atau Safari:
 
-| Tombol    | Fungsi |
-|-----------|--------|
-| SPACE     | Simpan huruf ke kalimat |
-| BACKSPACE | Hapus huruf terakhir |
-| ENTER     | Selesaikan kalimat |
-| ESC       | Keluar |
-
-### Special Mode
-
-Ketika sentence builder menghasilkan kata **"CLEO"**, otomatis:
-1. Animasi visual di layar
-2. Loading indicator
-3. Membuka website di browser default
-
-### Contoh Penggunaan
-
-```
-H → E → L → L → O  →  HELLO
-(tekan SPACE untuk setiap huruf, ENTER untuk menyelesaikan)
+```text
+http://localhost:8000
 ```
 
-## Catatan Teknis
+- Halaman **Landing Page** (`/`): Klik **`[ START CAMERA ]`** untuk masuk ke Studio.
+- Halaman **Studio** (`/studio`): Browser akan meminta izin kamera. Setelah diizinkan, video feed webcam akan langsung tampil di `<video>` element.
+- **Demo Mode**: Karena `model/model.keras` belum dilatih, server secara otomatis menggunakan `DummyPredictor` (mengirim siklus huruf A-Z dengan confidence 70-99%).
+- **Sentence Builder**: Gunakan tombol atau shortcut keyboard:
+  - `SPACE`: Tambah huruf terdeteksi saat ini ke kalimat.
+  - `BACKSPACE`: Hapus huruf terakhir.
+  - `ENTER`: Selesaikan kalimat & cek trigger word.
+- **Special Mode**: Ketik huruf hingga membentuk kata **`HENGKY`**, lalu tekan `ENTER` (atau tambah huruf `Y`). Aplikasi akan membuka halaman rahasia `/secret` (*"✨ SECRET UNLOCKED ✨"*).
 
-- Model menggunakan **Transfer Learning** dari EfficientNetB0 pretrained pada ImageNet
-- Backbone EfficientNetB0 di-**freeze** (tidak dilatih ulang)
-- Hanya classification head (GAP + Dense) yang dilatih
-- Input gambar di-resize ke **224×224** dan dinormalisasi [0, 1]
-- Data augmentation diterapkan **hanya saat training**
-- Confidence threshold: di bawah 60% ditampilkan sebagai "UNKNOWN"
-- Prediction smoothing: majority voting dari 10 frame terakhir
+---
+
+## 🧠 Model Fallback System
+
+Backend menggunakan arsitektur predictor decoupled:
+1. Jika `model/model.keras` **belum ada**: Server menggunakan `DummyPredictor`.
+2. Jika `model/model.keras` **sudah dilatih**: Server otomatis beralih ke `EfficientNetPredictor` tanpa perlu mengubah kode frontend.

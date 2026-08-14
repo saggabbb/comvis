@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASL Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/studio.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="logo">ASL STUDIO</div>
+        <div class="status-container">
+            <div class="status-item">
+                <span class="status-dot" id="cam-status"></span> CAMERA
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="ai-status"></span> AI CONNECTION
+            </div>
+            <div class="demo-badge hidden" id="demo-badge">DEMO MODE</div>
+        </div>
+    </header>
+
+    <main class="studio-layout">
+        <div class="video-container">
+            <video id="camera" autoplay playsinline></video>
+        </div>
+        
+        <div class="prediction-panel">
+            <div class="prediction-content">
+                <div class="detected-label">DETECTED</div>
+                <div class="prediction-letter" id="prediction-letter">-</div>
+                <div class="confidence-container">
+                    <div class="confidence-label">
+                        <span>CONFIDENCE</span>
+                        <span id="confidence-value">0%</span>
+                    </div>
+                    <div class="confidence-bar-bg">
+                        <div class="confidence-bar-fill" id="confidence-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="sentence-builder">
+        <div class="builder-header">
+            <div class="message-label">YOUR MESSAGE</div>
+            <div class="builder-actions">
+                <button class="btn-outline" id="btn-add">[+ ADD LETTER] (Space)</button>
+                <button class="btn-outline" id="btn-delete">[DELETE] (Backspace)</button>
+                <button class="btn-outline" id="btn-clear">[CLEAR] (Enter)</button>
+            </div>
+        </div>
+        <div class="sentence-display" id="sentence-display">
+            <!-- Letters will be injected here -->
+        </div>
+    </footer>
+
+    <script src="js/camera.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/sentence.js"></script>
+    <script src="js/studio.js"></script>
+</body>
+</html>

@@ -19,3 +19,6 @@ logs/
 
 .vscode/
 tempCodeRunnerFile.py
+
+dataset.zip
+dataset/
