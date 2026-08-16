@@ -67,7 +67,12 @@ from backend.config import (
     MAX_FPS,
     MODEL_PATH,
     TRIGGER_WORD,
+    BUFFER_SIZE,
+    MIN_BUFFER_SIZE,
+    DEBUG_LOGGING,
 )
+
+from backend.temporal_predictor import TemporalPredictor
 
 
 # ============================================================
@@ -283,6 +288,8 @@ async def get_status():
         ),
         "trigger_word": TRIGGER_WORD,
         "max_fps": MAX_FPS,
+        "buffer_size": BUFFER_SIZE,
+        "min_buffer_size": MIN_BUFFER_SIZE,
     }
 
 
@@ -295,20 +302,27 @@ async def websocket_predict(
     websocket: WebSocket
 ):
     """
-    Real-time prediction WebSocket.
+    Real-time prediction WebSocket dengan Backend Temporal Smoothing.
 
     Client:
         Sends binary JPEG frames.
 
     Server:
-        Returns JSON prediction.
+        1. Model inference per-frame (raw prediction)
+        2. Masukkan ke TemporalPredictor (sliding window buffer)
+        3. Calculate weighted vote & stable prediction
+        4. Return JSON stable prediction ke client.
 
     Example response:
 
     {
         "letter": "A",
-        "confidence": 0.9997,
-        "inference_ms": 140.2
+        "confidence": 0.8942,
+        "inference_ms": 15.2,
+        "is_stable": true,
+        "buffer_size": 15,
+        "raw_letter": "A",
+        "raw_confidence": 0.91
     }
     """
 
@@ -316,6 +330,13 @@ async def websocket_predict(
 
     print(
         "[WS] Client connected"
+    )
+
+    # Instansiasi TemporalPredictor per koneksi WebSocket (Session & Thread Isolated)
+    temporal_smoother = TemporalPredictor(
+        buffer_size=BUFFER_SIZE,
+        min_buffer_size=MIN_BUFFER_SIZE,
+        debug_logging=DEBUG_LOGGING,
     )
 
     # ========================================================
@@ -359,20 +380,35 @@ async def websocket_predict(
 
 
             # ------------------------------------------------
-            # Prediction
+            # 1. Per-frame Inference (Raw)
             # ------------------------------------------------
 
-            result = predictor.predict(
+            raw_result = predictor.predict(
                 frame_bytes
+            )
+
+            raw_letter = raw_result.get("letter")
+            raw_confidence = raw_result.get("confidence", 0.0)
+            inference_ms = raw_result.get("inference_ms", 0.0)
+
+
+            # ------------------------------------------------
+            # 2. Temporal Smoothing & Weighted Voting (Backend)
+            # ------------------------------------------------
+
+            stable_result = temporal_smoother.add_prediction(
+                raw_letter=raw_letter,
+                raw_confidence=raw_confidence,
+                inference_ms=inference_ms,
             )
 
 
             # ------------------------------------------------
-            # Send prediction
+            # 3. Send Stable Prediction
             # ------------------------------------------------
 
             await websocket.send_json(
-                result
+                stable_result
             )
 
 
@@ -404,6 +440,11 @@ async def websocket_predict(
         except Exception:
 
             pass
+
+    finally:
+
+        # Reset buffer saat koneksi terputus
+        temporal_smoother.reset()
 
 
 # ============================================================

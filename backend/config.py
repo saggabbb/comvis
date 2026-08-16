@@ -69,6 +69,20 @@ MAX_FPS = 8
 
 
 # ============================================================
+# TEMPORAL SMOOTHING CONFIGURATION
+# ============================================================
+
+# Ukuran sliding window buffer per-koneksi
+BUFFER_SIZE = 15
+
+# Jumlah minimum frame dalam buffer sebelum menghasilkan stable prediction
+MIN_BUFFER_SIZE = 5
+
+# Flag pengaktifan logging di terminal
+DEBUG_LOGGING = True
+
+
+# ============================================================
 # SIGN LANGUAGE SETTINGS
 # ============================================================
 
