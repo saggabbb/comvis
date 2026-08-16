@@ -2,278 +2,181 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>ASL Studio</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignVision — ASL Studio</title>
 
     <!-- ================================================== -->
-    <!-- FONT -->
+    <!-- GOOGLE FONTS (Inter) -->
     <!-- ================================================== -->
-
-    <link
-        rel="preconnect"
-        href="https://fonts.googleapis.com"
-    >
-
-    <link
-        rel="preconnect"
-        href="https://fonts.gstatic.com"
-        crossorigin
-    >
-
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap"
-        rel="stylesheet"
-    >
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- ================================================== -->
-    <!-- STUDIO CSS -->
+    <!-- STUDIO STYLES -->
     <!-- ================================================== -->
-
-    <link
-        rel="stylesheet"
-        href="css/studio.css"
-    >
-
+    <link rel="stylesheet" href="css/studio.css">
 
     <!-- ================================================== -->
-    <!-- MEDIAPIPE HANDS -->
+    <!-- MEDIAPIPE LIBRARIES (HAND TRACKING VISUALIZATION ONLY) -->
     <!-- ================================================== -->
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
-        crossorigin="anonymous"
-    ></script>
-
-    <script
-        src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
-        crossorigin="anonymous"
-    ></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
-
 
 <body>
 
-
     <!-- ================================================== -->
-    <!-- TOP BAR -->
+    <!-- TOP NAVIGATION & STATUS BAR -->
     <!-- ================================================== -->
-
     <header class="top-bar">
-
-        <div class="logo">
-            ASL STUDIO
+        <div class="logo-group">
+            <div class="logo" aria-label="SignVision Brand">ASL STUDIO</div>
+            <div class="brand-tag">SIGNVISION CV</div>
         </div>
 
-
-        <div class="status-container">
-
-            <div class="status-item">
-
-                <span
-                    class="status-dot"
-                    id="cam-status"
-                ></span>
-
-                CAMERA
-
+        <div class="status-container" role="status" aria-live="polite">
+            <!-- Camera Status -->
+            <div class="status-item" title="Camera stream state">
+                <span class="status-dot" id="cam-status"></span>
+                <span id="cam-status-text">CAMERA</span>
             </div>
 
-
-            <div class="status-item">
-
-                <span
-                    class="status-dot"
-                    id="ai-status"
-                ></span>
-
-                AI CONNECTION
-
+            <!-- Hand Detection Status -->
+            <div class="status-item" title="MediaPipe hand detection state">
+                <span class="status-dot" id="hand-status"></span>
+                <span id="hand-status-text">HAND</span>
             </div>
 
+            <!-- AI Connection Status -->
+            <div class="status-item" title="WebSocket AI backend connection">
+                <span class="status-dot" id="ai-status"></span>
+                <span id="ai-status-text">AI CONNECTION</span>
+            </div>
 
-            <div
-                class="demo-badge hidden"
-                id="demo-badge"
-            >
+            <!-- Demo Mode Badge -->
+            <div class="demo-badge hidden" id="demo-badge" title="Running in Demo Mode without model.keras">
                 DEMO MODE
             </div>
-
         </div>
-
     </header>
 
-
-
     <!-- ================================================== -->
-    <!-- MAIN STUDIO -->
+    <!-- MAIN STUDIO WORKSPACE -->
     <!-- ================================================== -->
-
     <main class="studio-layout">
 
+        <!-- ============================================== -->
+        <!-- CAMERA & OVERLAY SECTION -->
+        <!-- ============================================== -->
+        <section class="video-container" aria-label="Camera Video Feed">
+            <video id="camera" autoplay playsinline muted></video>
 
-        <!-- ================================================== -->
-        <!-- CAMERA -->
-        <!-- ================================================== -->
+            <!-- Hand Tracking Overlay Canvas -->
+            <canvas id="hand-overlay"></canvas>
 
-        <div class="video-container">
-
-            <video
-                id="camera"
-                autoplay
-                playsinline
-            ></video>
-
-
-            <!--
-                Canvas overlay untuk:
-
-                1. Hand landmarks
-                2. Hand connections
-                3. Bounding box
-
-                Canvas dibuat transparan sehingga
-                video tetap terlihat.
-            -->
-
-            <canvas
-                id="hand-overlay"
-            ></canvas>
-
-        </div>
-
-
-
-        <!-- ================================================== -->
-        <!-- PREDICTION PANEL -->
-        <!-- ================================================== -->
-
-        <div class="prediction-panel">
-
-            <div class="prediction-content">
-
-                <div class="detected-label">
-                    DETECTED
-                </div>
-
-
-                <div
-                    class="prediction-letter"
-                    id="prediction-letter"
-                >
-                    -
-                </div>
-
-
-                <div class="confidence-container">
-
-                    <div class="confidence-label">
-
-                        <span>
-                            CONFIDENCE
-                        </span>
-
-                        <span id="confidence-value">
-                            0%
-                        </span>
-
-                    </div>
-
-
-                    <div class="confidence-bar-bg">
-
-                        <div
-                            class="confidence-bar-fill"
-                            id="confidence-bar"
-                        ></div>
-
-                    </div>
-
-                </div>
-
+            <!-- Camera Status Banner / Toast Overlay -->
+            <div class="camera-overlay-message hidden" id="cam-overlay-msg">
+                <div class="spinner" id="cam-spinner"></div>
+                <span id="cam-msg-text">Initializing camera...</span>
             </div>
 
-        </div>
+            <!-- Camera Controls (Start/Stop) -->
+            <div class="camera-controls">
+                <button class="btn-cam-toggle" id="btn-toggle-cam" aria-label="Toggle Camera Start or Stop">
+                    <span class="btn-icon">📷</span>
+                    <span id="btn-toggle-cam-text">STOP CAMERA</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- PREDICTION RESULTS PANEL -->
+        <!-- ============================================== -->
+        <section class="prediction-panel" aria-label="Sign Language Detection Panel">
+            <div class="prediction-content">
+                <div class="panel-header">
+                    <span class="detected-label">CURRENT SIGN</span>
+                    <span class="stability-badge warming" id="stability-badge">
+                        <span class="badge-dot"></span>
+                        <span id="stability-text">Warming up</span>
+                    </span>
+                </div>
+
+                <!-- Prediction Letter Display -->
+                <div class="letter-wrapper">
+                    <div class="prediction-letter" id="prediction-letter" aria-label="Detected Letter">-</div>
+                </div>
+
+                <!-- Confidence Bar -->
+                <div class="confidence-container">
+                    <div class="confidence-label">
+                        <span>CONFIDENCE</span>
+                        <span id="confidence-value">0%</span>
+                    </div>
+                    <div class="confidence-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="confidence-bar-bg">
+                        <div class="confidence-bar-fill" id="confidence-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Recent Signs History -->
+                <div class="history-container">
+                    <div class="history-label">RECENT SIGNS</div>
+                    <div class="history-pills" id="recent-signs-container">
+                        <span class="history-empty">No signs detected yet</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
     </main>
 
-
-
     <!-- ================================================== -->
-    <!-- SENTENCE BUILDER -->
+    <!-- SENTENCE BUILDER FOOTER -->
     <!-- ================================================== -->
-
-    <footer class="sentence-builder">
-
+    <footer class="sentence-builder" aria-label="Sentence Builder Control Panel">
         <div class="builder-header">
-
-            <div class="message-label">
-                YOUR MESSAGE
+            <div class="message-meta">
+                <span class="message-label">YOUR MESSAGE</span>
+                <span class="char-count-badge" id="char-count-badge">0 characters</span>
             </div>
-
 
             <div class="builder-actions">
-
-                <button
-                    class="btn-outline"
-                    id="btn-add"
-                >
-                    [+ ADD LETTER] (Space)
+                <button class="btn-action btn-add" id="btn-add" aria-label="Add current letter to sentence">
+                    <span class="btn-text">[+ ADD LETTER]</span>
+                    <span class="btn-shortcut">(Space)</span>
                 </button>
 
-
-                <button
-                    class="btn-outline"
-                    id="btn-delete"
-                >
-                    [DELETE] (Backspace)
+                <button class="btn-action btn-delete" id="btn-delete" aria-label="Delete last character">
+                    <span class="btn-text">[DELETE]</span>
+                    <span class="btn-shortcut">(Backspace)</span>
                 </button>
 
-
-                <button
-                    class="btn-outline"
-                    id="btn-clear"
-                >
-                    [CLEAR] (Enter)
+                <button class="btn-action btn-clear" id="btn-clear" aria-label="Clear sentence">
+                    <span class="btn-text">[CLEAR]</span>
+                    <span class="btn-shortcut">(Enter)</span>
                 </button>
-
             </div>
-
         </div>
 
-
-        <div
-            class="sentence-display"
-            id="sentence-display"
-        >
-            <!-- Letters will be injected here -->
+        <div class="sentence-display" id="sentence-display" aria-label="Sentence Output Display">
+            <span class="sentence-placeholder">Start signing and press [+ ADD LETTER] to build words...</span>
         </div>
-
     </footer>
 
-
+    <!-- ================================================== -->
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <!-- ================================================== -->
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <!-- ================================================== -->
     <!-- JAVASCRIPT MODULES -->
     <!-- ================================================== -->
-
     <script src="js/camera.js"></script>
-
     <script src="js/websocket.js"></script>
-
     <script src="js/sentence.js"></script>
-
     <script src="js/studio.js"></script>
-
 
 </body>
 
