@@ -39,11 +39,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // APP STATE (CENTRALIZED PREDICTION STATE)
     // ========================================================
     const predictionState = {
-        status: 'no-camera', // 'no-camera' | 'no-hand' | 'disconnected' | 'warming-up' | 'stable'
+        status: 'no-camera', // 'no-camera' | 'no-hand' | 'disconnected' | 'warming-up' | 'stable' | 'uncertain'
         letter: '-',
         confidence: 0,
         isStable: false,
+        isUncertain: false,
         warmingCount: 0
+    };
+
+    let systemState = {
+        demoMode: false,
+        modelReady: false
     };
 
     let lastStableLetterAdded = null;
@@ -81,17 +87,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     SentenceModule.init('sentence-display', 'char-count-badge');
 
     // Check system status & Demo mode
-    try {
-        const response = await fetch('/api/status');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.demo_mode) {
-                demoBadge.classList.remove('hidden');
+    async function fetchSystemStatus() {
+        try {
+            const response = await fetch('/api/status');
+            if (response.ok) {
+                const data = await response.json();
+                systemState.demoMode = data.demo_mode;
+                systemState.modelReady = data.model_ready;
+                if (data.demo_mode) {
+                    demoBadge.classList.remove('hidden');
+                }
+                updateStatusDots();
             }
+        } catch (e) {
+            console.log('[Studio] Status API not available, assuming default mode.');
         }
-    } catch (e) {
-        console.log('[Studio] Status API not available, assuming default mode.');
     }
+    await fetchSystemStatus();
 
 
     // ========================================================
@@ -134,12 +146,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 predictionState.letter = '-';
                 predictionState.confidence = 0;
                 predictionState.isStable = false;
+                predictionState.isUncertain = false;
                 predictionState.warmingCount = incomingData.buffer_size || 0;
+            } else if (incomingData.is_uncertain) {
+                predictionState.status = 'uncertain';
+                predictionState.letter = incomingData.letter;
+                predictionState.confidence = incomingData.confidence || 0;
+                predictionState.isStable = true;
+                predictionState.isUncertain = true;
             } else {
                 predictionState.status = 'stable';
                 predictionState.letter = incomingData.letter;
                 predictionState.confidence = incomingData.confidence || 0;
                 predictionState.isStable = true;
+                predictionState.isUncertain = false;
             }
         }
 
@@ -152,7 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Renders UI strictly based on the current predictionState object.
      */
     function renderPredictionUI() {
-        const { status, letter, confidence, isStable, warmingCount } = predictionState;
+        const { status, letter, confidence, isStable, isUncertain, warmingCount } = predictionState;
 
         // --- STABILITY BADGE & CURRENT SIGN ---
         switch (status) {
@@ -177,9 +197,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderCurrentSign('-', 0, false);
                 break;
 
+            case 'uncertain':
+                setStabilityBadge('warming', 'Uncertain');
+                renderCurrentSign(letter, confidence, true, true);
+                break;
+
             case 'stable':
                 setStabilityBadge('stable', 'Stable');
-                renderCurrentSign(letter, confidence, true);
+                renderCurrentSign(letter, confidence, true, false);
                 
                 // Add to Recent Signs if this is a newly arrived stable letter
                 if (lastStableLetterAdded !== letter) {
@@ -194,7 +219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     /**
      * Renders Current Sign letter and Confidence Bar.
      */
-    function renderCurrentSign(letter, confidence, isActive) {
+    function renderCurrentSign(letter, confidence, isActive, isUncertain = false) {
         if (predictionLetter.textContent !== letter) {
             predictionLetter.classList.remove('active');
             
@@ -213,6 +238,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const confPct = isActive ? Math.round(confidence * 100) : 0;
         confidenceValue.textContent = `${confPct}%`;
         confidenceBar.style.width = `${confPct}%`;
+
+        if (isUncertain) {
+            confidenceBar.style.background = 'var(--warning-color)';
+        } else {
+            confidenceBar.style.background = ''; // reset to default css gradient
+        }
     }
 
 
@@ -226,35 +257,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Camera Status Dot
         if (camStatus === 'connected') {
-            camStatusDot.className = 'status-dot active';
+            camStatusDot.className = 'status-indicator active';
             camStatusText.textContent = 'CAMERA';
         } else if (camStatus === 'initializing') {
-            camStatusDot.className = 'status-dot connecting';
-            camStatusText.textContent = 'CAM INITIALIZING';
+            camStatusDot.className = 'status-indicator connecting';
+            camStatusText.textContent = 'CAM INIT';
         } else {
-            camStatusDot.className = 'status-dot offline';
-            camStatusText.textContent = 'CAM OFFLINE';
+            camStatusDot.className = 'status-indicator offline';
+            camStatusText.textContent = 'CAM OFF';
         }
 
         // Hand Detection Dot
         if (camStatus === 'connected' && handDetected) {
-            handStatusDot.className = 'status-dot active';
+            handStatusDot.className = 'status-indicator active';
             handStatusText.textContent = 'HAND DETECTED';
         } else {
-            handStatusDot.className = 'status-dot offline';
+            handStatusDot.className = 'status-indicator offline';
             handStatusText.textContent = 'HAND';
         }
 
-        // AI Connection Dot
+        // Model / AI Connection Dot
         if (wsStatus === 'connected') {
-            aiStatusDot.className = 'status-dot active';
-            aiStatusText.textContent = 'AI CONNECTED';
+            const pingText = predictionState.lastPingMs ? ` (${predictionState.lastPingMs}ms)` : '';
+            if (systemState.demoMode) {
+                aiStatusDot.className = 'status-indicator connecting';
+                aiStatusText.textContent = `DEMO MODE${pingText}`;
+            } else if (systemState.modelReady) {
+                aiStatusDot.className = 'status-indicator active';
+                aiStatusText.textContent = `MODEL READY${pingText}`;
+            } else {
+                aiStatusDot.className = 'status-indicator connecting';
+                aiStatusText.textContent = `MODEL LOADING${pingText}`;
+            }
         } else if (wsStatus === 'connecting' || wsStatus === 'reconnecting') {
-            aiStatusDot.className = 'status-dot connecting';
-            aiStatusText.textContent = 'AI CONNECTING';
+            aiStatusDot.className = 'status-indicator connecting';
+            aiStatusText.textContent = 'CONNECTING';
         } else {
-            aiStatusDot.className = 'status-dot offline';
-            aiStatusText.textContent = 'AI OFFLINE';
+            aiStatusDot.className = 'status-indicator offline';
+            aiStatusText.textContent = 'MODEL OFF';
         }
 
         // Camera Overlay Message Banner Lifecycle
@@ -374,27 +414,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Handle prediction data from backend
     WSModule.onPrediction((data) => {
+        predictionState.isWaitingForResponse = false;
+        if (predictionState.frameSendTime) {
+            predictionState.lastPingMs = Date.now() - predictionState.frameSendTime;
+        }
         updatePredictionState(data);
     });
 
 
     // ========================================================
-    // 5. PREDICTION FRAME LOOP (8 FPS)
+    // 5. PREDICTION FRAME LOOP (Dynamic FPS)
     // ========================================================
     function startPredictionLoop() {
         if (loopTimer) clearInterval(loopTimer);
+        predictionState.isWaitingForResponse = false;
+        predictionState.frameSendTime = 0;
+        predictionState.lastPingMs = 0;
 
-        // 8 FPS pacing = 125ms interval
+        // Poll at ~30 FPS (33ms), but ONLY send if we aren't waiting for a response.
+        // This acts as a natural backpressure system and eliminates queue-buildup lag.
         loopTimer = setInterval(async () => {
             updatePredictionState();
 
+            if (predictionState.isWaitingForResponse) {
+                return; // Wait for backend to finish processing the previous frame
+            }
+
             if (CameraModule.getStatus() === 'connected' && WSModule.isConnected() && CameraModule.isHandDetected()) {
+                predictionState.isWaitingForResponse = true;
                 const blob = await CameraModule.captureFrame();
                 if (blob) {
+                    predictionState.frameSendTime = Date.now();
                     WSModule.send(blob);
+                } else {
+                    predictionState.isWaitingForResponse = false;
                 }
             }
-        }, 125);
+        }, 33);
     }
 
 

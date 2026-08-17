@@ -4,23 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SignVision ASL Studio — Real-time American Sign Language recognition using EfficientNetB0 and MediaPipe Hand Landmarker.">
     <title>SignVision — ASL Studio</title>
 
-    <!-- ================================================== -->
-    <!-- GOOGLE FONTS (Inter) -->
-    <!-- ================================================== -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <!-- ================================================== -->
-    <!-- STUDIO STYLES -->
-    <!-- ================================================== -->
+    <!-- Studio Styles -->
     <link rel="stylesheet" href="css/studio.css">
 
-    <!-- ================================================== -->
-    <!-- MEDIAPIPE LIBRARIES (HAND TRACKING VISUALIZATION ONLY) -->
-    <!-- ================================================== -->
+    <!-- MediaPipe (frontend hand overlay visualization only) -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 </head>
@@ -28,151 +23,139 @@
 <body>
 
     <!-- ================================================== -->
-    <!-- TOP NAVIGATION & STATUS BAR -->
+    <!-- HEADER — Branding & System Status                  -->
     <!-- ================================================== -->
     <header class="top-bar">
-        <div class="logo-group">
-            <div class="logo" aria-label="SignVision Brand">ASL STUDIO</div>
-            <div class="brand-tag">SIGNVISION CV</div>
+        <div class="header-left">
+            <div class="brand">
+                <span class="brand-name">SignVision</span>
+                <span class="brand-sep">/</span>
+                <span class="brand-page">ASL Studio</span>
+            </div>
+            <div class="demo-badge hidden" id="demo-badge">DEMO</div>
         </div>
 
-        <div class="status-container" role="status" aria-live="polite">
-            <!-- Camera Status -->
-            <div class="status-item" title="Camera stream state">
-                <span class="status-dot" id="cam-status"></span>
-                <span id="cam-status-text">CAMERA</span>
+        <div class="status-row" role="status" aria-live="polite">
+            <div class="status-item" id="status-camera" title="Camera stream">
+                <span class="status-indicator" id="cam-status"></span>
+                <span class="status-label" id="cam-status-text">CAMERA</span>
             </div>
-
-            <!-- Hand Detection Status -->
-            <div class="status-item" title="MediaPipe hand detection state">
-                <span class="status-dot" id="hand-status"></span>
-                <span id="hand-status-text">HAND</span>
+            <div class="status-divider"></div>
+            <div class="status-item" id="status-hand" title="Hand detection">
+                <span class="status-indicator" id="hand-status"></span>
+                <span class="status-label" id="hand-status-text">HAND</span>
             </div>
-
-            <!-- AI Connection Status -->
-            <div class="status-item" title="WebSocket AI backend connection">
-                <span class="status-dot" id="ai-status"></span>
-                <span id="ai-status-text">AI CONNECTION</span>
-            </div>
-
-            <!-- Demo Mode Badge -->
-            <div class="demo-badge hidden" id="demo-badge" title="Running in Demo Mode without model.keras">
-                DEMO MODE
+            <div class="status-divider"></div>
+            <div class="status-item" id="status-model" title="Backend model connection">
+                <span class="status-indicator" id="ai-status"></span>
+                <span class="status-label" id="ai-status-text">MODEL</span>
             </div>
         </div>
     </header>
 
     <!-- ================================================== -->
-    <!-- MAIN STUDIO WORKSPACE -->
+    <!-- MAIN WORKSPACE                                     -->
     <!-- ================================================== -->
     <main class="studio-layout">
 
         <!-- ============================================== -->
-        <!-- CAMERA & OVERLAY SECTION -->
+        <!-- LEFT: Camera Feed                              -->
         <!-- ============================================== -->
-        <section class="video-container" aria-label="Camera Video Feed">
-            <video id="camera" autoplay playsinline muted></video>
+        <section class="video-section" aria-label="Camera feed">
+            <div class="video-container">
+                <video id="camera" autoplay playsinline muted></video>
+                <canvas id="hand-overlay"></canvas>
 
-            <!-- Hand Tracking Overlay Canvas -->
-            <canvas id="hand-overlay"></canvas>
+                <!-- Camera status overlay -->
+                <div class="cam-overlay hidden" id="cam-overlay-msg">
+                    <div class="cam-overlay-inner">
+                        <div class="cam-spinner" id="cam-spinner"></div>
+                        <span id="cam-msg-text">Initializing camera...</span>
+                    </div>
+                </div>
 
-            <!-- Camera Status Banner / Toast Overlay -->
-            <div class="camera-overlay-message hidden" id="cam-overlay-msg">
-                <div class="spinner" id="cam-spinner"></div>
-                <span id="cam-msg-text">Initializing camera...</span>
-            </div>
-
-            <!-- Camera Controls (Start/Stop) -->
-            <div class="camera-controls">
-                <button class="btn-cam-toggle" id="btn-toggle-cam" aria-label="Toggle Camera Start or Stop">
-                    <span class="btn-icon">📷</span>
-                    <span id="btn-toggle-cam-text">STOP CAMERA</span>
-                </button>
+                <!-- Camera toggle -->
+                <div class="video-controls">
+                    <button class="btn-cam" id="btn-toggle-cam" aria-label="Toggle camera">
+                        <span id="btn-toggle-cam-text">STOP</span>
+                    </button>
+                </div>
             </div>
         </section>
 
         <!-- ============================================== -->
-        <!-- PREDICTION RESULTS PANEL -->
+        <!-- RIGHT: Prediction Panel                        -->
         <!-- ============================================== -->
-        <section class="prediction-panel" aria-label="Sign Language Detection Panel">
-            <div class="prediction-content">
-                <div class="panel-header">
-                    <span class="detected-label">CURRENT SIGN</span>
-                    <span class="stability-badge warming" id="stability-badge">
-                        <span class="badge-dot"></span>
-                        <span id="stability-text">Warming up</span>
-                    </span>
+        <section class="prediction-panel" aria-label="Prediction output">
+
+            <!-- Current Sign -->
+            <div class="panel-block" id="block-prediction">
+                <div class="block-label">CURRENT SIGN</div>
+                <div class="prediction-state-badge" id="stability-badge">
+                    <span class="state-dot" id="state-dot"></span>
+                    <span id="stability-text">Waiting...</span>
                 </div>
 
-                <!-- Prediction Letter Display -->
-                <div class="letter-wrapper">
-                    <div class="prediction-letter" id="prediction-letter" aria-label="Detected Letter">-</div>
+                <div class="letter-display">
+                    <div class="prediction-letter" id="prediction-letter" aria-label="Detected letter">—</div>
                 </div>
 
-                <!-- Confidence Bar -->
-                <div class="confidence-container">
-                    <div class="confidence-label">
-                        <span>CONFIDENCE</span>
-                        <span id="confidence-value">0%</span>
+                <div class="conf-block">
+                    <div class="conf-row">
+                        <span class="conf-label">CONFIDENCE</span>
+                        <span class="conf-value" id="confidence-value">—</span>
                     </div>
-                    <div class="confidence-bar-bg" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="confidence-bar-bg">
-                        <div class="confidence-bar-fill" id="confidence-bar"></div>
-                    </div>
-                </div>
-
-                <!-- Recent Signs History -->
-                <div class="history-container">
-                    <div class="history-label">RECENT SIGNS</div>
-                    <div class="history-pills" id="recent-signs-container">
-                        <span class="history-empty">No signs detected yet</span>
+                    <div class="conf-bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="conf-bar-fill" id="confidence-bar"></div>
                     </div>
                 </div>
             </div>
+
+            <!-- Recent Signs -->
+            <div class="panel-block" id="block-history">
+                <div class="block-label">RECENT SIGNS</div>
+                <div class="history-row" id="recent-signs-container">
+                    <span class="history-empty">No signs detected yet</span>
+                </div>
+            </div>
+
         </section>
 
     </main>
 
     <!-- ================================================== -->
-    <!-- SENTENCE BUILDER FOOTER -->
+    <!-- SENTENCE BUILDER FOOTER                            -->
     <!-- ================================================== -->
-    <footer class="sentence-builder" aria-label="Sentence Builder Control Panel">
-        <div class="builder-header">
-            <div class="message-meta">
-                <span class="message-label">YOUR MESSAGE</span>
-                <span class="char-count-badge" id="char-count-badge">0 characters</span>
+    <footer class="sentence-builder" aria-label="Sentence builder">
+        <div class="builder-top">
+            <div class="builder-meta">
+                <span class="builder-label">MESSAGE</span>
+                <span class="char-badge" id="char-count-badge">0 chars</span>
             </div>
-
-            <div class="builder-actions">
-                <button class="btn-action btn-add" id="btn-add" aria-label="Add current letter to sentence">
-                    <span class="btn-text">[+ ADD LETTER]</span>
-                    <span class="btn-shortcut">(Space)</span>
+            <div class="builder-controls">
+                <button class="btn-action btn-add" id="btn-add" aria-label="Add letter to sentence">
+                    + ADD LETTER
+                    <kbd>Space</kbd>
                 </button>
-
                 <button class="btn-action btn-delete" id="btn-delete" aria-label="Delete last character">
-                    <span class="btn-text">[DELETE]</span>
-                    <span class="btn-shortcut">(Backspace)</span>
+                    DELETE
+                    <kbd>⌫</kbd>
                 </button>
-
                 <button class="btn-action btn-clear" id="btn-clear" aria-label="Clear sentence">
-                    <span class="btn-text">[CLEAR]</span>
-                    <span class="btn-shortcut">(Enter)</span>
+                    CLEAR
+                    <kbd>↵</kbd>
                 </button>
             </div>
         </div>
-
-        <div class="sentence-display" id="sentence-display" aria-label="Sentence Output Display">
-            <span class="sentence-placeholder">Start signing and press [+ ADD LETTER] to build words...</span>
+        <div class="sentence-display" id="sentence-display" aria-label="Sentence output">
+            <span class="sentence-placeholder">Sign a letter, then press [+ ADD LETTER] to build a word...</span>
         </div>
     </footer>
 
-    <!-- ================================================== -->
-    <!-- TOAST NOTIFICATION CONTAINER -->
-    <!-- ================================================== -->
-    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <!-- Toast notifications -->
+    <div class="toast-stack" id="toast-container" aria-live="polite"></div>
 
-    <!-- ================================================== -->
-    <!-- JAVASCRIPT MODULES -->
-    <!-- ================================================== -->
+    <!-- JavaScript modules -->
     <script src="js/camera.js"></script>
     <script src="js/websocket.js"></script>
     <script src="js/sentence.js"></script>
@@ -180,4 +163,4 @@
 
 </body>
 
-</html>
+</html>

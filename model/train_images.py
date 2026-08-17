@@ -4,21 +4,26 @@ model/train_images.py
 Train an EfficientNetB0-based ASL alphabet image classifier using Transfer Learning.
 
 Architecture:
-    Input(224x224x3)
-    → Data Augmentation (RandomFlip, RandomRotation, RandomZoom, RandomBrightness)
-    → EfficientNetB0 (ImageNet pretrained, frozen)
+    Input(224x224x3)  [float32, range 0–255 — model handles /255 internally]
+    → Data Augmentation (RandomRotation, RandomZoom, RandomTranslation, RandomBrightness)
+    → EfficientNetB0 (ImageNet pretrained, frozen backbone)
     → GlobalAveragePooling2D
     → Dropout(0.3)
-    → Dense(26, softmax)
+    → Dense(29, softmax)  [A-Z + del + nothing + space]
+
+Preprocessing Note:
+    EfficientNetB0 in this model already contains an internal Rescaling layer
+    (scale = 1/255). Input images must be float32 in range [0, 255].
+    DO NOT divide by 255 before passing to the model.
 
 Callbacks:
     - EarlyStopping (patience=5, restore_best_weights=True)
     - ReduceLROnPlateau (factor=0.5, patience=3)
-    - ModelCheckpoint (save_best_only=True)
+    - ModelCheckpoint (save_best_only=True, monitor=val_accuracy)
 
 Outputs:
-    model/model.keras
-    model/labels.json
+    model/SignVision_EfficientNetB0_final.keras
+    model/class_names.json
     model/training_history.png
     model/classification_report.txt
     model/confusion_matrix.csv
@@ -46,7 +51,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from helpers import discover_class_names, save_labels
+from scripts.helpers import discover_class_names, save_labels
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -97,7 +102,10 @@ def load_images_to_array(image_paths, img_size):
         with Image.open(path) as img:
             img = img.convert("RGB")
             img = img.resize((img_size, img_size), Image.BILINEAR)
-            images.append(np.asarray(img, dtype=np.float32) / 255.0)
+            # NOTE: Do NOT divide by 255 here.
+            # EfficientNetB0 has an internal Rescaling layer (scale=1/255).
+            # Input must be float32 in range [0, 255].
+            images.append(np.asarray(img, dtype=np.float32))
         if (i + 1) % 2000 == 0 or (i + 1) == total:
             print(f"  Loaded {i+1}/{total} images", flush=True)
     return np.stack(images, axis=0)
@@ -113,10 +121,12 @@ def build_efficientnet_model(input_shape, num_classes):
     inputs = keras.Input(shape=input_shape)
 
     # Data augmentation layers (only active during training)
-    x = layers.RandomFlip("horizontal")(inputs)
-    x = layers.RandomRotation(0.1)(x)
-    x = layers.RandomZoom(0.1)(x)
-    x = layers.RandomBrightness(0.1)(x)
+    # NOTE: No RandomFlip(horizontal) — horizontal flip can confuse ASL handedness
+    x = layers.RandomRotation(0.08)(inputs)         # ±~29 degrees
+    x = layers.RandomZoom(0.10)(x)                  # ±10% zoom
+    x = layers.RandomTranslation(0.05, 0.05)(x)     # ±5% shift
+    # RandomBrightness value_range must match input range [0, 255]
+    x = layers.RandomBrightness(factor=0.1, value_range=(0, 255))(x)
 
     # EfficientNetB0 backbone with ImageNet weights
     base_model = keras.applications.EfficientNetB0(
@@ -240,10 +250,10 @@ def main():
     model.summary()
 
     # Callbacks
-    model_path = str(MODEL_DIR / "model.keras")
+    model_path = str(MODEL_DIR / "SignVision_EfficientNetB0_final.keras")
     cbs = [
         keras.callbacks.EarlyStopping(
-            monitor="val_loss", patience=5,
+            monitor="val_accuracy", patience=5,
             restore_best_weights=True, verbose=1
         ),
         keras.callbacks.ReduceLROnPlateau(
@@ -251,7 +261,7 @@ def main():
             patience=3, min_lr=1e-6, verbose=1
         ),
         keras.callbacks.ModelCheckpoint(
-            filepath=model_path, monitor="val_loss",
+            filepath=model_path, monitor="val_accuracy",
             save_best_only=True, verbose=1
         ),
     ]
@@ -269,9 +279,9 @@ def main():
     model.save(model_path)
     print(f"\nSaved model to {model_path}")
 
-    labels_path = str(MODEL_DIR / "labels.json")
+    labels_path = str(MODEL_DIR / "class_names.json")
     save_labels(class_names, labels_path)
-    print(f"Saved labels to {labels_path}")
+    print(f"Saved class names to {labels_path}")
 
     # Training history plot
     plot_history(history, str(MODEL_DIR))

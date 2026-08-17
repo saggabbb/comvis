@@ -61,11 +61,11 @@ LABELS_PATH = os.path.join(
 # Ukuran input model
 IMG_SIZE = 224
 
-# Minimum confidence prediction
+# Minimum confidence for prediction (below this = UNCERTAIN)
 CONFIDENCE_THRESHOLD = 0.60
 
 # Maximum prediction FPS
-MAX_FPS = 8
+MAX_FPS = 15
 
 
 # ============================================================
@@ -73,10 +73,14 @@ MAX_FPS = 8
 # ============================================================
 
 # Ukuran sliding window buffer per-koneksi
-BUFFER_SIZE = 15
+BUFFER_SIZE = 10
 
 # Jumlah minimum frame dalam buffer sebelum menghasilkan stable prediction
-MIN_BUFFER_SIZE = 5
+MIN_BUFFER_SIZE = 3
+
+# Minimum fraction of buffer frames that must agree on same class
+# before prediction is marked stable (e.g. 0.60 = 60% of frames)
+STABILITY_RATIO = 0.60
 
 # Flag pengaktifan logging di terminal
 DEBUG_LOGGING = True
@@ -94,8 +98,8 @@ TRIGGER_WORD = "HENGKY"
 # ROI & HAND DETECTION CONFIGURATION
 # ============================================================
 
-# Margin bounding box tangan (15%)
-ROI_MARGIN_RATIO = 0.15
+# Margin bounding box tangan (25% — increased from 15% for better finger coverage)
+ROI_MARGIN_RATIO = 0.25
 
 # Static ROI fallback (ketika tangan tidak terdeteksi)
 STATIC_ROI = {
@@ -106,4 +110,4 @@ STATIC_ROI = {
 }
 
 # Flag pengaktifan logging ROI di terminal
-DEBUG_ROI = True
+DEBUG_ROI = True

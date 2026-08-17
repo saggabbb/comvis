@@ -69,6 +69,8 @@ from backend.config import (
     TRIGGER_WORD,
     BUFFER_SIZE,
     MIN_BUFFER_SIZE,
+    CONFIDENCE_THRESHOLD,
+    STABILITY_RATIO,
     DEBUG_LOGGING,
 )
 
@@ -279,17 +281,15 @@ async def get_status():
     return {
         "application": "SignVision",
         "predictor_type": predictor.__class__.__name__,
-        "model_available": os.path.exists(
-            MODEL_PATH
-        ),
-        "demo_mode": isinstance(
-            predictor,
-            DummyPredictor
-        ),
+        "model_available": os.path.exists(MODEL_PATH),
+        "model_ready": not isinstance(predictor, DummyPredictor),
+        "demo_mode": isinstance(predictor, DummyPredictor),
         "trigger_word": TRIGGER_WORD,
         "max_fps": MAX_FPS,
         "buffer_size": BUFFER_SIZE,
         "min_buffer_size": MIN_BUFFER_SIZE,
+        "confidence_threshold": CONFIDENCE_THRESHOLD,
+        "stability_ratio": STABILITY_RATIO,
     }
 
 
@@ -336,17 +336,10 @@ async def websocket_predict(
     temporal_smoother = TemporalPredictor(
         buffer_size=BUFFER_SIZE,
         min_buffer_size=MIN_BUFFER_SIZE,
+        confidence_threshold=CONFIDENCE_THRESHOLD,
+        stability_ratio=STABILITY_RATIO,
         debug_logging=DEBUG_LOGGING,
     )
-
-    # ========================================================
-    # FPS LIMIT
-    # ========================================================
-
-    min_interval = 1.0 / MAX_FPS
-
-    last_time = 0.0
-
 
     # ========================================================
     # RECEIVE FRAMES
@@ -363,20 +356,6 @@ async def websocket_predict(
             frame_bytes = (
                 await websocket.receive_bytes()
             )
-
-            # ------------------------------------------------
-            # Rate limiting
-            # ------------------------------------------------
-
-            now = time.time()
-
-            if (
-                now - last_time
-                < min_interval
-            ):
-                continue
-
-            last_time = now
 
 
             # ------------------------------------------------
@@ -409,6 +388,7 @@ async def websocket_predict(
                     "confidence": 0.0,
                     "inference_ms": inference_ms,
                     "is_stable": False,
+                    "is_uncertain": False,
                     "buffer_size": 0,
                     "raw_letter": None,
                     "raw_confidence": 0.0,

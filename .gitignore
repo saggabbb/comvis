@@ -22,3 +22,11 @@ tempCodeRunnerFile.py
 
 dataset.zip
 dataset/
+
+# Evaluation outputs
+evaluation/*.json
+evaluation/*.txt
+evaluation/*.png
+
+# Archived models
+model/archive/
