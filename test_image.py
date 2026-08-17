@@ -14,7 +14,15 @@ test_images/
 """
 
 import os
+import sys
 import cv2
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 from backend.predictor import EfficientNetPredictor
 

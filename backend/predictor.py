@@ -43,7 +43,15 @@ if ROOT_DIR not in sys.path:
 # CONFIG
 # ============================================================
 
-from backend.config import MODEL_PATH, LABELS_PATH, IMG_SIZE
+from backend.config import (
+    MODEL_PATH,
+    LABELS_PATH,
+    IMG_SIZE,
+    ROI_MARGIN_RATIO,
+    STATIC_ROI,
+    DEBUG_ROI,
+)
+from backend.hand_detector import HandDetector
 
 
 # ============================================================
@@ -88,7 +96,11 @@ class DummyPredictor:
             "letter": letter,
             "confidence": confidence,
             "inference_ms": round(elapsed, 2),
+            "hand_detected": True,
+            "roi": [0, 0, 320, 320],
+            "is_hand_roi": True,
         }
+
 
 
 # ============================================================
@@ -217,6 +229,21 @@ class EfficientNetPredictor:
         )
 
 
+        # ====================================================
+        # INIT HAND DETECTOR (MEDIAPIPE AUTO ROI)
+        # ====================================================
+
+        self.hand_detector = HandDetector(
+            margin_ratio=ROI_MARGIN_RATIO,
+            static_roi_config=STATIC_ROI,
+        )
+
+        if self.hand_detector.is_available:
+            print("[Predictor] MediaPipe Hand ROI Detector ready.")
+        else:
+            print("[Predictor] MediaPipe unavailable - running with static ROI fallback.")
+
+
     # ========================================================
     # PREDICT
     # ========================================================
@@ -246,82 +273,108 @@ class EfficientNetPredictor:
                 "letter": "?",
                 "confidence": 0.0,
                 "inference_ms": 0.0,
+                "hand_detected": False,
+                "roi": None,
+                "is_hand_roi": False,
             }
 
         # ====================================================
         # 2. BGR → RGB
         # ====================================================
 
-        img = cv2.cvtColor(
+        rgb = cv2.cvtColor(
             img,
             cv2.COLOR_BGR2RGB
         )
 
         # ====================================================
-        # 3. RESIZE
+        # 3. MEDIAPIPE HAND DETECTION & AUTO ROI
         # ====================================================
 
-        img = cv2.resize(
-            img,
+        roi, hand_detected, is_hand_roi = self.hand_detector.compute_roi(
+            rgb
+        )
+        roi_x, roi_y, roi_w, roi_h = roi
+
+        if DEBUG_ROI:
+            if hand_detected:
+                print(
+                    f"[ROI] Hand: YES | ROI: ({roi_x}, {roi_y}, {roi_x + roi_w}, {roi_y + roi_h})"
+                )
+            else:
+                print(
+                    f"[ROI] Hand: NO | Using fallback ROI: ({roi_x}, {roi_y}, {roi_x + roi_w}, {roi_y + roi_h})"
+                )
+
+        # ====================================================
+        # 4. CROP ROI TANGAN
+        # ====================================================
+
+        cropped = rgb[
+            roi_y : roi_y + roi_h,
+            roi_x : roi_x + roi_w
+        ]
+
+        if cropped.size == 0 or cropped.shape[0] == 0 or cropped.shape[1] == 0:
+            cropped = rgb
+
+        # ====================================================
+        # 5. RESIZE 224x224
+        # ====================================================
+
+        resized = cv2.resize(
+            cropped,
             (IMG_SIZE, IMG_SIZE)
         )
 
         # ====================================================
-        # 4. CONVERT TO FLOAT32
+        # 6. CONVERT TO FLOAT32
         # ====================================================
         #
         # TIDAK menggunakan:
         #
-        # img = img / 255.0
+        # resized = resized / 255.0
         #
         # karena model EfficientNetB0 yang digunakan
         # menangani preprocessing inputnya sendiri.
         #
 
-        img = img.astype(
+        input_img = resized.astype(
             np.float32
         )
 
         # ====================================================
-        # 5. TAMBAHKAN BATCH DIMENSION
+        # 7. TAMBAHKAN BATCH DIMENSION (1, 224, 224, 3)
         # ====================================================
 
-        img = np.expand_dims(
-            img,
+        input_batch = np.expand_dims(
+            input_img,
             axis=0
         )
 
-        # Bentuk input:
-        #
-        # (1, 224, 224, 3)
-
         # ====================================================
-        # 6. MODEL INFERENCE
+        # 8. MODEL INFERENCE
         # ====================================================
 
         preds = self.model.predict(
-            img,
+            input_batch,
             verbose=0
         )
 
         # ====================================================
-        # 7. AMBIL CONFIDENCE TERTINGGI
+        # 9. AMBIL CONFIDENCE TERTINGGI & INDEX KELAS
         # ====================================================
 
         confidence = float(
             np.max(preds)
         )
 
-        # ====================================================
-        # 8. AMBIL INDEX KELAS
-        # ====================================================
-
         label_idx = int(
             np.argmax(preds)
         )
 
         # ====================================================
-        # 9. UBAH INDEX MENJADI LABEL
+        # 10. UBAH INDEX MENJADI LABEL
         # ====================================================
 
         letter = self.labels_map.get(
@@ -330,7 +383,7 @@ class EfficientNetPredictor:
         )
 
         # ====================================================
-        # 10. HITUNG WAKTU INFERENCE
+        # 11. HITUNG WAKTU INFERENCE
         # ====================================================
 
         elapsed = (
@@ -338,7 +391,7 @@ class EfficientNetPredictor:
         ) * 1000
 
         # ====================================================
-        # 11. RETURN HASIL
+        # 12. RETURN HASIL
         # ====================================================
 
         return {
@@ -351,7 +404,11 @@ class EfficientNetPredictor:
                 elapsed,
                 2
             ),
+            "hand_detected": hand_detected,
+            "roi": [roi_x, roi_y, roi_w, roi_h],
+            "is_hand_roi": is_hand_roi,
         }
+
 
 
 # ============================================================

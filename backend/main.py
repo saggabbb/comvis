@@ -390,11 +390,42 @@ async def websocket_predict(
             raw_letter = raw_result.get("letter")
             raw_confidence = raw_result.get("confidence", 0.0)
             inference_ms = raw_result.get("inference_ms", 0.0)
+            hand_detected = raw_result.get("hand_detected", True)
+            is_hand_roi = raw_result.get("is_hand_roi", True)
+            roi = raw_result.get("roi")
 
 
             # ------------------------------------------------
-            # 2. Temporal Smoothing & Weighted Voting (Backend)
+            # 2. Hand State Handling & Temporal Smoothing
             # ------------------------------------------------
+            # Jika tangan TIDAK terdeteksi oleh MediaPipe:
+            # - Reset temporal buffer agar prediction lama tidak tertahan
+            # - Jangan masukkan raw prediction ke TemporalPredictor
+            # - Kirimkan state no-hand yang jelas ke WebSocket client
+            if not hand_detected:
+                temporal_smoother.reset()
+                no_hand_response = {
+                    "letter": None,
+                    "confidence": 0.0,
+                    "inference_ms": inference_ms,
+                    "is_stable": False,
+                    "buffer_size": 0,
+                    "raw_letter": None,
+                    "raw_confidence": 0.0,
+                    "hand_detected": False,
+                    "is_hand_roi": False,
+                    "roi": roi,
+                }
+                await websocket.send_json(
+                    no_hand_response
+                )
+                continue
+
+
+            # ------------------------------------------------
+            # 3. Temporal Smoothing & Weighted Voting (Backend)
+            # ------------------------------------------------
+            # Hanya diproses ketika ROI benar-benar berasal dari tangan
 
             stable_result = temporal_smoother.add_prediction(
                 raw_letter=raw_letter,
@@ -402,14 +433,19 @@ async def websocket_predict(
                 inference_ms=inference_ms,
             )
 
+            stable_result["hand_detected"] = True
+            stable_result["is_hand_roi"] = is_hand_roi
+            stable_result["roi"] = roi
+
 
             # ------------------------------------------------
-            # 3. Send Stable Prediction
+            # 4. Send Stable Prediction
             # ------------------------------------------------
 
             await websocket.send_json(
                 stable_result
             )
+
 
 
     # ========================================================

@@ -88,3 +88,22 @@ DEBUG_LOGGING = True
 
 # Trigger word yang digunakan aplikasi
 TRIGGER_WORD = "HENGKY"
+
+
+# ============================================================
+# ROI & HAND DETECTION CONFIGURATION
+# ============================================================
+
+# Margin bounding box tangan (15%)
+ROI_MARGIN_RATIO = 0.15
+
+# Static ROI fallback (ketika tangan tidak terdeteksi)
+STATIC_ROI = {
+    "x": 0.30,
+    "y": 0.10,
+    "w": 0.40,
+    "h": 0.75,
+}
+
+# Flag pengaktifan logging ROI di terminal
+DEBUG_ROI = True
